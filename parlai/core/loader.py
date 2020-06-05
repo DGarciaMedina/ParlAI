@@ -351,7 +351,6 @@ def load_world_module(
         # The case of opt['task'] = 'parlai.tasks.squad.agents:DefaultTeacher'
         # (i.e. specifying your own path directly, assumes DialogPartnerWorld)
         return _get_default_world(default_world, num_agents)
-
     task = task_path_list[0].lower()
     if len(task_path_list) > 1:
         task_path_list[1] = task_path_list[1][0].upper() + task_path_list[1][1:]
@@ -368,10 +367,11 @@ def load_world_module(
         else:
             world_name = "DefaultWorld"
     module_name = "%s.tasks.%s.worlds" % (repo, task)
-
     try:
         my_module = importlib.import_module(module_name)
+        print(my_module.__name__)
         world_class = getattr(my_module, world_name)
+        print(world_class.__name__)
     except (ModuleNotFoundError, AttributeError):
         # Defaults to this if you did not specify a world for your task.
         world_class = _get_default_world(default_world, num_agents)

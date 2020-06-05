@@ -422,6 +422,131 @@ class DialogPartnerWorld(World):
                 a.global_metrics.sync()
 
 
+class EvelynWorld(World):
+    """
+    Simple world for a human to interact with multiple agents.
+
+    After one response from a human, multiple agents reply.
+    """
+
+    def __init__(self, opt: Opt, agents=None, shared=None):
+        if not ((agents is not None) ^ (shared is not None)):
+            raise ValueError('You must supply either agents or shared, but not both.')
+        super().__init__(opt)
+        if shared:
+            # Create agents based on shared data.
+            self.agents = create_agents_from_shared(shared['agents'])
+        else:
+            # Add passed in agents directly.
+            self.agents = agents
+        self.acts = [None] * len(self.agents)
+        if self.agents is not None and len(self.agents) > 0:
+            # Name the world after the first agent.
+            self.id = "Evelyn's " + self.get_task_agent().getID()
+
+    def get_task_agent(self):
+        """
+        Return task agent.
+        """
+        return self.get_agents()[0]
+
+    def get_model_agent(self):
+        """
+        Return model agent, if applicable.
+        """
+        return self.get_agents()[1]
+
+    def parley(self):
+        """
+        [human_agent, agent1, agent2, agent3, ...]
+        """
+        acts = self.acts
+        agents = self.agents
+
+        # Request input from human
+        acts[0] = agents[0].act()
+
+        # Iterate over all the agents
+        for agent_num in range(1,len(agents)):
+            agents[agent_num].observe(validate(acts[0]))
+            acts[agent_num] = agents[agent_num].act()
+            agents[0].observe(validate(acts[agent_num]))
+
+        self.update_counters()
+
+    def episode_done(self):
+        """
+        Only the first agent indicates when the episode is done.
+        """
+        if self.acts[0] is not None:
+            return self.acts[0].get('episode_done', False)
+        else:
+            return False
+
+    def epoch_done(self):
+        """
+        Only the first agent indicates when the epoch is done.
+        """
+        return self.get_task_agent().epoch_done()
+
+    def report(self):
+        """
+        Report all metrics of all subagents.
+        """
+        from parlai.core.metrics import Metric, LegacyMetric
+
+        metrics = {}
+        for a in self.agents:
+            if hasattr(a, 'report'):
+                m = a.report()
+                for k, v in m.items():
+                    if not isinstance(v, Metric):
+                        v = LegacyMetric(v)
+                    if k not in metrics:
+                        # first agent gets priority in settings values for keys
+                        # this way model can't e.g. override accuracy to 100%
+                        metrics[k] = v
+        if metrics and 'exs' in metrics:
+            self.total_exs += metrics['exs'].value()
+        return metrics
+
+    def num_examples(self):
+        """
+        Return number of examples.
+        """
+        if hasattr(self.get_task_agent(), 'num_examples'):
+            return self.get_task_agent().num_examples()
+        return 0
+
+    def num_episodes(self):
+        """
+        Return number of episodes.
+        """
+        if hasattr(self.get_task_agent(), 'num_episodes'):
+            return self.get_task_agent().num_episodes()
+        return 0
+
+    def shutdown(self):
+        """
+        Shutdown each agent.
+        """
+        for a in self.agents:
+            a.shutdown()
+
+    def update_counters(self):
+        """
+        Ensure all counters are synchronized across threads.
+        """
+        super().update_counters()
+        for a in self.agents:
+            if hasattr(a, 'update_counters'):
+                a.update_counters()
+            if hasattr(a, 'global_metrics'):
+                # torch agent has "global metrics" that might get backed up on OS X,
+                # see the SystemError exception in Metrics.
+                a.global_metrics.sync()
+
+
 class MultiAgentDialogWorld(World):
     """
     Basic world where each agent gets a turn in a round-robin fashion.
@@ -1590,7 +1715,6 @@ def create_task_world(opt: Opt, user_agents, default_world=None):
         num_agents=len(user_agents + task_agents),
         default_world=default_world,
     )
-
     return world_class(opt, task_agents + user_agents)
 
 

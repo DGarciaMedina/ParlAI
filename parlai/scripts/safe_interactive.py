@@ -78,6 +78,28 @@ def safe_interactive(opt, print_parser=None):
             print('EPOCH DONE')
             break
 
+def safe_interactive2(opts):
+    # Create model and assign it to the specified task
+    human_agent = SafeLocalHumanAgent(opts[0]) # any opt will do
+    agents = [human_agent]
+    for opt in opts:
+        agent = create_agent(opt, requireModelExists=True)
+        agents.append(agent)
+    world = create_task(opts[0], agents) # any opt will do
+    # Interact until episode done
+    while True:
+        world.parley()
+        bot_act = world.get_acts()[-1]
+        if 'bot_offensive' in bot_act and bot_act['bot_offensive']:
+            agent.reset()
+
+        if opt.get('display_examples'):
+            print('---')
+            print(world.display())
+        if world.epoch_done():
+            print('EPOCH DONE')
+            break
+
 
 if __name__ == '__main__':
     random.seed(42)

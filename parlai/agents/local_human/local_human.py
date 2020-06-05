@@ -52,6 +52,10 @@ class LocalHumanAgent(Agent):
         return self.finished
 
     def observe(self, msg):
+        # print(msg['text'])
+        # f = open("my_log.txt","a+")
+        # f.write(msg['text']+"\n")
+        # f.close()
         print(
             display_messages(
                 [msg],
@@ -65,6 +69,9 @@ class LocalHumanAgent(Agent):
         reply['id'] = self.getID()
         try:
             reply_text = input(colorize("Enter Your Message:", 'text') + ' ')
+            # f = open("my_log.txt","a+")
+            # f.write(reply_text+"\n")
+            # f.close()
         except EOFError:
             self.finished = True
             return {'episode_done': True}
